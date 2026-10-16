@@ -42,6 +42,138 @@ static const struct bb_model_target *lookup(void *context, uint32_t id) {
   return id == worker_target.identity ? &worker_target
                                      : bb_platform_model_find(context, id);
 }
+static void address_indexes(void) {
+  unsigned char storage[128][32];
+  uint32_t encoded;
+  void *decoded;
+  for (unsigned i = 0; i < 128; ++i)
+    CHECK(bb_address_bind(0x72000000u + ((i * 73) % 128) * 64,
+                           storage[(i * 37) % 128], 16));
+  for (unsigned i = 0; i < 128; ++i) {
+    uint32_t logical = 0x72000000u + ((i * 73) % 128) * 64;
+    unsigned char *host = storage[(i * 37) % 128];
+    CHECK(bb_address_try_encode(host + 15, &encoded) && encoded == logical + 15);
+    CHECK(bb_address_try_pointer(logical + 15, 1, &decoded) && decoded == host + 15);
+    CHECK(!bb_address_try_pointer(logical + 15, 2, &decoded));
+    CHECK(!bb_address_try_pointer(logical + 16, 1, &decoded));
+    CHECK(!bb_address_bind(0x73000000u, host + 1, 1));
+    CHECK(!bb_address_bind(logical + 8, storage[0] + 24, 1));
+  }
+  for (unsigned parity = 0; parity < 2; ++parity)
+    for (unsigned i = parity; i < 128; i += 2) {
+      uint32_t logical = 0x72000000u + ((i * 73) % 128) * 64;
+      CHECK(bb_address_unbind(logical));
+      CHECK(!bb_address_unbind(logical));
+    }
+  /* A low host address may itself have a mapping; preserve that precedence
+   * over the fallback which accepts already-logical four-byte pointers. */
+  CHECK(bb_address_bind(0x74000000u, (void *)(uintptr_t)0x123400, 16));
+  CHECK(bb_address_try_encode((void *)(uintptr_t)0x123408, &encoded) &&
+        encoded == 0x74000008u);
+  CHECK(bb_address_unbind(0x74000000u));
+  CHECK(bb_address_try_encode((void *)(uintptr_t)0x123408, &encoded) &&
+        encoded == 0x123408);
+}
+static uint32_t drawing(uint32_t object, uint32_t offset,
+                         const uint32_t *tail, size_t count) {
+  uint32_t args[8] = {object};
+  CHECK(count < 8);
+  memcpy(args + 1, tail, count * sizeof *args);
+  struct bb_call_state state = {0, 0, 0, 0x202};
+  bb_model_invoke(&state, BB_U32(BB_U32(object) + offset), args, count + 1);
+  return state.eax;
+}
+#define D(object, offset, ...) drawing(object, offset, (uint32_t[]){__VA_ARGS__}, \
+                                       sizeof((uint32_t[]){__VA_ARGS__}) / 4)
+static uint32_t make_surface(uint32_t draw, uint32_t scratch, unsigned width,
+                              unsigned height, unsigned bits) {
+  memset(BB_SPAN(scratch, 108), 0, 108);
+  BB_U32(scratch) = 108;
+  BB_U32(scratch + 4) = 7 | 0x1000;
+  BB_U32(scratch + 8) = height;
+  BB_U32(scratch + 12) = width;
+  BB_U32(scratch + 84) = bits;
+  BB_U32(scratch + 104) = 0x840;
+  CHECK(!D(draw, 0x18, scratch, scratch + 400, 0));
+  return BB_U32(scratch + 400);
+}
+static unsigned char *lock_surface(uint32_t surface, uint32_t scratch,
+                                    uint32_t *pitch) {
+  CHECK(!D(surface, 0x64, 0, scratch, 1, 0));
+  *pitch = BB_U32(scratch + 16);
+  return BB_DATA(BB_U32(scratch + 36));
+}
+static void blit_pixels(uint32_t scratch) {
+  CHECK(!CALL("DDRAW.dll", "DirectDrawCreate", 0, scratch + 400, 0));
+  uint32_t draw = BB_U32(scratch + 400);
+  uint32_t random = 0x12345678;
+  for (unsigned bits = 8; bits <= 32; bits *= 2) {
+    unsigned bytes = bits / 8;
+    uint32_t source = make_surface(draw, scratch, 17, 13, bits);
+    uint32_t target = make_surface(draw, scratch, 19, 11, bits);
+    uint32_t sp, dp;
+    unsigned char *input = lock_surface(source, scratch, &sp);
+    unsigned char *output = lock_surface(target, scratch, &dp);
+    unsigned char original[13 * 68], expected[11 * 76];
+    for (unsigned i = 0; i < 13 * sp; ++i)
+      original[i] = input[i] = (unsigned char)(i * 37);
+    CHECK(!D(source, 0x80, 0) && !D(target, 0x80, 0));
+    BB_U32(scratch + 288) = 32;
+    BB_U32(scratch + 292) = 160;
+    CHECK(!D(source, 0x74, 8, scratch + 288));
+    CHECK(!D(target, 0x74, 8, scratch + 288));
+    for (unsigned test = 0; test < 240; ++test) {
+      random = random * 1664525u + 1013904223u;
+      int left = (int)(random % 37) - 12, top = (int)((random >> 8) % 23) - 8;
+      int width = 1 + (int)((random >> 16) % 24);
+      int height = 1 + (int)((random >> 24) % 19);
+      int sx = (int)((random >> 5) % 25) - 5;
+      int sy = (int)((random >> 13) % 19) - 4;
+      int sw = width + (test % 5 == 0 ? 3 : 0);
+      int sh = height + (test % 9 == 0 ? 2 : 0);
+      int32_t dest[4] = {left, top, left + width, top + height};
+      int32_t src[4] = {sx, sy, sx + sw, sy + sh};
+      memcpy(BB_SPAN(scratch + 256, 16), src, 16);
+      memcpy(BB_SPAN(scratch + 272, 16), dest, 16);
+      int alias = test % 11 == 0;
+      uint32_t flags = test % 2 ? 0x8000 : 0;
+      if (test % 7 == 0)
+        flags |= 0x400;
+      memset(BB_SPAN(scratch + 512, 108), 0, 108);
+      BB_U32(scratch + 512 + 80) = 0x12345678;
+      output = lock_surface(target, scratch, &dp);
+      memset(output, 0xa5, dp * 11);
+      memset(expected, 0xa5, dp * 11);
+      CHECK(!D(target, 0x80, 0));
+      for (int y = top; y < top + height; ++y)
+        for (int x = left; x < left + width; ++x) {
+          if (x < 0 || y < 0 || x >= 19 || y >= 11)
+            continue;
+          uint32_t pixel = 0x12345678;
+          if (!(flags & 0x400)) {
+            int px = sx + (x - left) * sw / width;
+            int py = sy + (y - top) * sh / height;
+            if (px < 0 || py < 0 || px >= (alias ? 19 : 17) ||
+                py >= (alias ? 11 : 13))
+              continue;
+            pixel = 0;
+            memcpy(&pixel, (alias ? expected : original) +
+                   py * (alias ? dp : sp) + px * bytes, bytes);
+            if ((flags & 0x8000) && pixel >= 32 && pixel <= 160)
+              continue;
+          }
+          memcpy(expected + y * dp + x * bytes, &pixel, bytes);
+        }
+      CHECK(!D(target, 0x14, scratch + 272, alias ? target : source,
+                scratch + 256, flags, scratch + 512));
+      output = lock_surface(target, scratch, &dp);
+      CHECK(!memcmp(expected, output, dp * 11));
+      CHECK(!D(target, 0x80, 0));
+    }
+    CHECK(!D(source, 8, 0) && !D(target, 8, 0));
+  }
+  CHECK(!D(draw, 8, 0));
+}
 static void key(Uint32 type, SDL_Keycode code, SDL_Keymod modifiers, int repeat) {
   SDL_Event e = {0};
   e.type = type;
@@ -58,9 +190,11 @@ int main(void) {
   bb_host_initialize();
   SDL_SetMainReady();
 #endif
+  address_indexes();
   uint32_t stack = bb_heap_allocate(1024 * 1024);
   uint32_t scratch = bb_heap_zeroed(1, 4096);
   CHECK(stack && scratch && bb_model_attach(lookup, NULL, stack, 1024 * 1024));
+  blit_pixels(scratch);
 
   uint32_t pages = K("VirtualAlloc", 0, 65536, 0x2000, 4);
   CHECK(pages && K("IsBadReadPtr", pages, 1));

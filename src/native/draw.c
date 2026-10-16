@@ -327,6 +327,53 @@ static I32 W surface_blt(struct Surface *destination,
   if (source && source->bits != destination->bits)
     bb_die("mixed-depth DirectDraw blit %d -> %d", source->bits,
            destination->bits);
+  /* Sprite copies are overwhelmingly unscaled. Clip once, then copy rows
+   * instead of doing division, bounds checks and tiny memcpy calls per pixel.
+   * Keep self copies on the original path: its forward overlap is observable. */
+  if (source && !(flags & 0x400) &&
+      source->pixels != destination->pixels &&
+      (int64_t)d.right - d.left == (int64_t)s.right - s.left &&
+      (int64_t)d.bottom - d.top == (int64_t)s.bottom - s.top) {
+    int64_t left = d.left > 0 ? d.left : 0;
+    int64_t top = d.top > 0 ? d.top : 0;
+    int64_t right = d.right < destination->width ? d.right : destination->width;
+    int64_t bottom = d.bottom < destination->height ? d.bottom : destination->height;
+    int64_t source_left = (int64_t)d.left - s.left;
+    int64_t source_top = (int64_t)d.top - s.top;
+    if (left < source_left)
+      left = source_left;
+    if (top < source_top)
+      top = source_top;
+    if (right > source_left + source->width)
+      right = source_left + source->width;
+    if (bottom > source_top + source->height)
+      bottom = source_top + source->height;
+    if (left < right && top < bottom) {
+      size_t columns = (size_t)(right - left);
+      for (int64_t y = top; y < bottom; ++y) {
+        const unsigned char *input = source->pixels +
+            (size_t)(y - source_top) * source->pitch +
+            (size_t)(left - source_left) * bytes;
+        unsigned char *output = destination->pixels +
+            (size_t)y * destination->pitch + (size_t)left * bytes;
+        if (!(flags & 0x8000))
+          memcpy(output, input, columns * (size_t)bytes);
+        else if (bytes == 1) {
+          for (size_t x = 0; x < columns; ++x)
+            if (input[x] < source->color_low || input[x] > source->color_high)
+              output[x] = input[x];
+        } else {
+          for (size_t x = 0; x < columns; ++x) {
+            U32 pixel = 0;
+            memcpy(&pixel, input + x * bytes, (size_t)bytes);
+            if (pixel < source->color_low || pixel > source->color_high)
+              memcpy(output + x * bytes, &pixel, (size_t)bytes);
+          }
+        }
+      }
+    }
+    goto present;
+  }
   for (int y = d.top; y < d.bottom; y++)
     for (int x = d.left; x < d.right; x++) {
       if (x < 0 || y < 0 || x >= destination->width || y >= destination->height)
@@ -350,6 +397,7 @@ static I32 W surface_blt(struct Surface *destination,
       memcpy(destination->pixels + y * destination->pitch + x * bytes, &pixel,
              (size_t)bytes);
     }
+present:
   if (destination->caps & 0x200) {
     struct Palette *p =
         destination->palette ? destination->palette : display_palette;

@@ -8,7 +8,10 @@ struct Region {
   size_t size;
   unsigned char *host;
 };
-static struct Region *regions;
+/* Keep both lookup directions sorted. Rendering frequently encodes pointers
+ * back to game addresses; scanning every allocation made that cost grow with
+ * the number of loaded sprites. Both indexes share the same lock/lifetime. */
+static struct Region *regions, *host_regions;
 static size_t count, capacity;
 static pthread_rwlock_t region_lock = PTHREAD_RWLOCK_INITIALIZER;
 
@@ -17,6 +20,17 @@ static size_t lower_bound(uint32_t address) {
   while (lo < hi) {
     size_t mid = lo + (hi - lo) / 2;
     if (regions[mid].address < address)
+      lo = mid + 1;
+    else
+      hi = mid;
+  }
+  return lo;
+}
+static size_t lower_bound_host(uintptr_t host) {
+  size_t lo = 0, hi = count;
+  while (lo < hi) {
+    size_t mid = lo + (hi - lo) / 2;
+    if ((uintptr_t)host_regions[mid].host < host)
       lo = mid + 1;
     else
       hi = mid;
@@ -32,14 +46,19 @@ static int bind_locked(uint32_t address, void *host, size_t size) {
       size - 1 > UINTPTR_MAX - (uintptr_t)host)
     return 0;
   size_t index = lower_bound(address);
+  size_t host_index = lower_bound_host((uintptr_t)host);
   int valid = !(index && overlaps(address, size, regions[index - 1].address,
                                   regions[index - 1].size)) &&
               !(index < count && overlaps(address, size, regions[index].address,
                                           regions[index].size));
-  for (size_t i = 0; valid && i < count; ++i)
-    if (overlaps((uintptr_t)host, size, (uintptr_t)regions[i].host,
-                 regions[i].size))
-      valid = 0;
+  valid = valid &&
+          !(host_index && overlaps((uintptr_t)host, size,
+                                  (uintptr_t)host_regions[host_index - 1].host,
+                                  host_regions[host_index - 1].size)) &&
+          !(host_index < count &&
+            overlaps((uintptr_t)host, size,
+                     (uintptr_t)host_regions[host_index].host,
+                     host_regions[host_index].size));
   if (valid && count == capacity) {
     size_t next = capacity && capacity <= SIZE_MAX / 2 ? capacity * 2
                   : capacity                           ? 0
@@ -51,13 +70,22 @@ static int bind_locked(uint32_t address, void *host, size_t size) {
       valid = 0;
     else {
       regions = grown;
-      capacity = next;
+      struct Region *host_grown = realloc(host_regions, next * sizeof(*grown));
+      if (!host_grown)
+        valid = 0;
+      else {
+        host_regions = host_grown;
+        capacity = next;
+      }
     }
   }
   if (valid) {
     for (size_t i = count; i > index; --i)
       regions[i] = regions[i - 1];
     regions[index] = (struct Region){address, size, host};
+    for (size_t i = count; i > host_index; --i)
+      host_regions[i] = host_regions[i - 1];
+    host_regions[host_index] = regions[index];
     ++count;
   }
   return valid;
@@ -98,11 +126,15 @@ int bb_address_unbind(uint32_t address) {
   size_t index = lower_bound(address);
   int found = index < count && regions[index].address == address;
   if (found) {
+    size_t host_index = lower_bound_host((uintptr_t)regions[index].host);
+    for (size_t i = host_index + 1; i < count; ++i)
+      host_regions[i - 1] = host_regions[i];
     for (size_t i = index + 1; i < count; ++i)
       regions[i - 1] = regions[i];
     if (!--count) {
       free(regions);
-      regions = NULL;
+      free(host_regions);
+      regions = host_regions = NULL;
       capacity = 0;
     }
   }
@@ -141,10 +173,15 @@ int bb_address_try_encode(const void *pointer, uint32_t *result) {
     return 0;
   uintptr_t host = (uintptr_t)pointer;
   pthread_rwlock_rdlock(&region_lock);
-  for (size_t i = 0; i < count; ++i) {
-    uintptr_t start = (uintptr_t)regions[i].host;
-    if (host >= start && host - start < regions[i].size) {
-      *result = regions[i].address + (uint32_t)(host - start);
+  size_t index = lower_bound_host(host);
+  if (index == count || (uintptr_t)host_regions[index].host != host) {
+    if (index)
+      --index;
+  }
+  if (index < count) {
+    uintptr_t start = (uintptr_t)host_regions[index].host;
+    if (host >= start && host - start < host_regions[index].size) {
+      *result = host_regions[index].address + (uint32_t)(host - start);
       pthread_rwlock_unlock(&region_lock);
       return 1;
     }
