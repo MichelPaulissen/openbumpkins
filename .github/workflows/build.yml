@@ -3,6 +3,7 @@ name: Native builds
 on:
   push:
     branches: [main, ci/native-platforms]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -45,10 +46,12 @@ jobs:
       - name: Collect executable and notices
         run: |
           mkdir -p dist/LICENSES
-          cp build/ci/bumpkins LICENSE README.md dist/
+          cp build/ci/bumpkins LICENSE README.md RUNNING.md dist/
+          cp tools/extract_native_assets.py dist/
           cp LICENSES/* dist/LICENSES/
           if [ "${{ runner.os }}" = macOS ]; then
             test "$(uname -m)" = arm64
+            python3 tools/bundle_macos.py --directory dist --test-binary build/ci/runtime-smoke
             otool -L dist/bumpkins
           else
             ldd dist/bumpkins
@@ -89,7 +92,8 @@ jobs:
       - name: Collect executable, dependencies and notices
         run: |
           mkdir -p dist/LICENSES
-          cp build/ci/bumpkins.exe LICENSE README.md dist/
+          cp build/ci/bumpkins.exe LICENSE README.md RUNNING.md dist/
+          cp tools/extract_native_assets.py dist/
           cp LICENSES/* dist/LICENSES/
           cp /ucrt64/bin/SDL2.dll /ucrt64/bin/libwinpthread-1.dll /ucrt64/bin/libgcc_s_seh-1.dll dist/
           cp -R /ucrt64/share/licenses/SDL2 /ucrt64/share/licenses/libgcc /ucrt64/share/licenses/libwinpthread dist/LICENSES/
@@ -104,3 +108,53 @@ jobs:
           name: openbumpkins-windows-x86_64
           path: dist/
           if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [unix, windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: artifacts
+      - name: Create platform archives and checksums
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir release
+          chmod +x artifacts/openbumpkins-linux-x86_64/bumpkins artifacts/openbumpkins-macos-arm64/bumpkins
+          tar -czf "release/openbumpkins-${RELEASE_TAG}-linux-x86_64.tar.gz" -C artifacts openbumpkins-linux-x86_64
+          tar -czf "release/openbumpkins-${RELEASE_TAG}-macos-arm64.tar.gz" -C artifacts openbumpkins-macos-arm64
+          python3 - <<'PY'
+          import os, pathlib, zipfile
+          root = pathlib.Path('artifacts/openbumpkins-windows-x86_64')
+          target = pathlib.Path('release') / ('openbumpkins-' + os.environ['RELEASE_TAG'] + '-windows-x86_64.zip')
+          with zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(root.rglob('*')):
+                  if path.is_file():
+                      archive.write(path, path.relative_to(root.parent))
+          PY
+          cd release
+          sha256sum -- *.tar.gz *.zip > SHA256SUMS
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          Native builds for Linux x86-64, Apple Silicon macOS and Windows x86-64.
+
+          Original game data is required and is not included. Each package includes
+          RUNNING.md, the resource-extraction tool and license notices.
+
+          macOS and Windows packages include their SDL/runtime libraries. Linux
+          requires system SDL2. See RUNNING.md for platform requirements and commands.
+
+          All three builds pass asset-free runtime smoke tests. Windows gameplay
+          validation is limited; full campaign playtesting remains ongoing.
+          EOF
+          gh release create "$RELEASE_TAG" release/* --verify-tag --title "OpenBumpkins $RELEASE_TAG" --notes-file release-notes.md
