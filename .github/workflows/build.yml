@@ -40,6 +40,8 @@ jobs:
         run: cmake --build build/ci --parallel 3
       - name: Launcher smoke test
         run: build/ci/bumpkins --help
+      - name: Runtime smoke tests without game assets
+        run: ctest --test-dir build/ci --output-on-failure
       - name: Collect executable and notices
         run: |
           mkdir -p dist/LICENSES
@@ -82,6 +84,8 @@ jobs:
         run: cmake --build build/ci --parallel 3
       - name: Launcher smoke test
         run: build/ci/bumpkins.exe --help
+      - name: Runtime smoke tests without game assets
+        run: ctest --test-dir build/ci --output-on-failure
       - name: Collect executable, dependencies and notices
         run: |
           mkdir -p dist/LICENSES
