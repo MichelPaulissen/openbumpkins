@@ -2,7 +2,7 @@ name: Native builds
 
 on:
   push:
-    branches: [ci/native-platforms]
+    branches: [main, ci/native-platforms]
   pull_request:
   workflow_dispatch:
 
