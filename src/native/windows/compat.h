@@ -6,7 +6,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
-#include <sys/stat.h>
 void bb_host_initialize(void);
 void bb_host_debug_break(void);
 char *bb_host_realpath(const char *, char *);
