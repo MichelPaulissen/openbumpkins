@@ -2,6 +2,7 @@
 #include "abi.h"
 #include "object_initializers.h"
 #include "world.h"
+#include "ui_layout.h"
 #include "interface_controls.h"
 #include "interop.h"
 #ifdef BB_MODEL_RUNTIME
@@ -61,7 +62,7 @@ void BB_THISCALL bb_icon_panel_initialize_entry(void *self) {
   uintptr_t p = (uintptr_t)self;
   BB_U32(p + 0x16) = 0;
   int32_t width = BB_I32(0x00484444);
-  BB_U32(p + 0x12) = 180;
+  BB_I32(p + 0x12) = 180 + bb_ui_canvas_y();
   BYTE(p + 4) = 0;
   BB_I32(p + 0xe) = width / 2;
 #ifndef BB_MODEL_RUNTIME

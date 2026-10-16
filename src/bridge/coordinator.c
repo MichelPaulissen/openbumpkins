@@ -7,6 +7,7 @@
 #include "letters.h"
 #include "mission_io.h"
 #include "script.h"
+#include "ui_layout.h"
 #include <string.h>
 #ifdef BB_MODEL_RUNTIME
 #include "game_file.h"
@@ -311,9 +312,11 @@ void bb_frame_update_entry(void) {
       self_call(0x0041c360, 0x00640ce8);
       self_call(0x00429480, 0x005eac80);
       uintptr_t weather = BB_U32(0x005e477c);
-      sprite(weather, 639u - BB_U32(weather + 0x44), 46, BB_U32(0x00484768));
+      sprite(weather, bb_ui_right(639) - BB_U32(weather + 0x44), 46,
+             BB_U32(0x00484768));
       weather = BB_U32(0x005e477c);
-      pending(639u - BB_U32(weather + 0x44), 46, 640,
+      pending(bb_ui_right(639) - BB_U32(weather + 0x44), 46,
+              BB_U32(0x484444),
               BB_U32(weather + 0x48) + 46u);
     }
     self_call(0x004271c0, 0x006b08c0);
@@ -382,7 +385,7 @@ void bb_frame_update_entry(void) {
       BYTE(0x004843f0) = BYTE(0x004844a4);
     }
     if (BB_U32(0x004842a0))
-      font(0x005c5b70, 0x00486e14, 630, 6, 2);
+      font(0x005c5b70, 0x00486e14, bb_ui_right(630), 6, 2);
     if (BB_U32(0x00484704) == 2) {
 #ifndef BB_MODEL_RUNTIME
       typedef void (*marquee_fn)(uint32_t, uint32_t, uint32_t, uint32_t);

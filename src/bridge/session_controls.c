@@ -10,6 +10,7 @@
 #include "game_calls.h"
 #include "session_models.h"
 #include "statistics.h"
+#include "ui_layout.h"
 #include <stddef.h>
 #define BYTE(a) BB_U8(a)
 #define WORD(a) BB_U16(a)
@@ -209,9 +210,12 @@ void bb_session_info_c(struct text_frame *frame) {
   load_text(frame, 0x48874c, frame->first);
   load_text(frame, 0x488704, frame->second);
   bb_archive_close(PTR(0x5d1028));
-  bb_sprite_draw(PTR(BB_U32(0x5c77b8)), 0, 0, 255, 1);
-  bb_font_draw_wrapped(PTR(0x641028), frame->first, 20, 36, 600, 1, NULL);
-  bb_font_draw_wrapped(PTR(0x641028), frame->second, 20, 358, 600, 1, NULL);
+  int32_t dx = bb_ui_canvas_x(), dy = bb_ui_canvas_y();
+  bb_sprite_draw(PTR(BB_U32(0x5c77b8)), dx, dy, 255, 1);
+  bb_font_draw_wrapped(PTR(0x641028), frame->first, 20 + dx, 36 + dy,
+                        600, 1, NULL);
+  bb_font_draw_wrapped(PTR(0x641028), frame->second, 20 + dx, 358 + dy,
+                        600, 1, NULL);
   present();
   if (!bb_session_wait_entry(500))
     bb_sound_play_entry(BB_U32(0x5c9518u + (uint32_t)(bb_random() % 13) * 4u));
@@ -233,8 +237,10 @@ void bb_session_outro_c(struct text_frame *frame) {
   bb_archive_open(PTR(0x5d1028));
   load_text(frame, 0x488758, frame->first);
   bb_archive_close(PTR(0x5d1028));
-  bb_sprite_draw(PTR(BB_U32(0x4842d0)), 0, 0, 255, 1);
-  bb_font_draw_wrapped(PTR(0x6ab590), frame->first, 20, 30, 600, 0, NULL);
+  int32_t dx = bb_ui_canvas_x(), dy = bb_ui_canvas_y();
+  bb_sprite_draw(PTR(BB_U32(0x4842d0)), dx, dy, 255, 1);
+  bb_font_draw_wrapped(PTR(0x6ab590), frame->first, 20 + dx, 30 + dy,
+                        600, 0, NULL);
   bb_session_music_start_entry(2);
   present();
   bb_session_wait_entry(500);

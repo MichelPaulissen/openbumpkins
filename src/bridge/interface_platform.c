@@ -7,6 +7,7 @@
 #include "dialog.h"
 #include "interface_controls.h"
 #include "interop.h"
+#include "ui_layout.h"
 #include "statistics.h"
 #include "world.h"
 #include <stddef.h>
@@ -220,11 +221,12 @@ bb_nearest_free_tile_entry(uint32_t x, uint32_t y, uint8_t *out_x,
 
 static void stock_text(char *text, int32_t x) {
   int32_t x1, y1, x2, y2;
-  bb_font_bounds(PTR(0x5cf3f0), text, x, 470, 2, &x1, &y1, &x2, &y2);
+  bb_font_bounds(PTR(0x5cf3f0), text, x, bb_ui_bottom(470), 2,
+                  &x1, &y1, &x2, &y2);
   bb_display_shade(PTR(0x4eebc8), (int32_t)((uint32_t)x1 - 3),
                    (int32_t)((uint32_t)y1 - 3), (int32_t)((uint32_t)x2 + 3),
                    (int32_t)((uint32_t)y2 + 3));
-  bb_font_draw(PTR(0x5cf3f0), text, x, 470, 2);
+  bb_font_draw(PTR(0x5cf3f0), text, x, bb_ui_bottom(470), 2);
 }
 /* Explicit incoming frame avoids uninitialized C in the original default arm.
  */
@@ -276,7 +278,7 @@ uint32_t bb_stock_panel_draw_c(void *object, uint32_t frame) {
         *(uint32_t *)text = 0;
         if (slot)
           copy_text((uintptr_t)text, BB_U32(slot) ? BB_U32(slot) : 0x48481c);
-        stock_text(text, 636);
+        stock_text(text, bb_ui_right(636));
       }
     } else {
       unsigned kind = BYTE(e + 0xd4);
@@ -289,7 +291,7 @@ uint32_t bb_stock_panel_draw_c(void *object, uint32_t frame) {
             WORD(0x55503a + (owner + kind) * 2u) * BYTE(0x6635bf + bank);
         char text[256];
         FORMAT(text, PTR(0x4885d4), current, capacity);
-        stock_text(text, 630);
+        stock_text(text, bb_ui_right(630));
       } else if (kind == 0x67) {
         BYTE(0x4842bc) = BYTE(e + 0xf8);
         unsigned prof = BYTE(BB_U32(p + 40) + 0xf4);
@@ -357,9 +359,14 @@ void bb_panel_mode_entry(uint32_t mode) {
 void BB_THISCALL bb_mission_description_draw_entry(void *object) {
   uintptr_t p = (uintptr_t)object;
   if (BB_U32(p)) {
+    int32_t viewport[4];
+    memcpy(viewport, BB_SPAN(0x4eebc8, sizeof viewport), sizeof viewport);
+    int32_t x = bb_ui_canvas_x(), y = bb_ui_canvas_y();
+    bb_display_intersect(PTR(0x4eebc8), x, y, 640, 480);
     if (BB_U32(0x4842d0))
-      bb_sprite_draw(PTR(BB_U32(0x4842d0)), 0, 0, 255, 1);
-    bb_sprite_draw(PTR(BB_U32(0x6afb20)), 0, BB_I32(p + 8), 255, 1);
+      bb_sprite_draw(PTR(BB_U32(0x4842d0)), x, y, 255, 1);
+    bb_sprite_draw(PTR(BB_U32(0x6afb20)), x, y + BB_I32(p + 8), 255, 1);
+    memcpy(BB_SPAN(0x4eebc8, sizeof viewport), viewport, sizeof viewport);
   }
 }
 void BB_THISCALL

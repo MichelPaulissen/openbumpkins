@@ -9,6 +9,7 @@
 #include "interop.h"
 #include "session_controls.h"
 #include "worker_runtime.h"
+#include "ui_layout.h"
 #include <string.h>
 #if defined(BB_NATIVE_RUNTIME) || defined(BB_MODEL_RUNTIME)
 int bb_native_dispatch_pending(uint32_t *quit_code);
@@ -1017,7 +1018,12 @@ int32_t BB_STDCALL bb_game_main_entry(void *instance, void *prior,
         BB_U32(0x0048426c) = 1;
         BB_U32(0x00484274) = 0;
       }
-      M0(0x0042f740, BB_U32(0x005c77b8));
+      if (bb_ui_canvas_x() || bb_ui_canvas_y()) {
+        bb_display_clear(PTR(DISPLAY));
+        bb_sprite_draw(PTR(BB_U32(0x005c77b8)), bb_ui_canvas_x(),
+                         bb_ui_canvas_y(), 255, 1);
+      } else
+        M0(0x0042f740, BB_U32(0x005c77b8));
       M0(0x0042f240, DISPLAY);
     } else if (BB_U32(0x0048426c) == 1)
       menu_iteration();

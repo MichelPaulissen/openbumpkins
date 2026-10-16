@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "interop.h"
 #include "game_calls.h"
+#include "ui_layout.h"
 
 /* Original asset-loading callers expect ECX/EDX to survive the disabled path.
  * The boundary thunk keeps that behavior, which a C void function cannot
@@ -39,7 +40,8 @@ void bb_loading_progress(void) {
   bb_draw_sprite_fn draw = (bb_draw_sprite_fn)BB_CODE((uintptr_t)0x0042fd90);
   bb_present_fn present = (bb_present_fn)BB_CODE((uintptr_t)0x0042f240);
 #endif
-  draw(BB_POINTER(0x0060461c), 0, 0, 255, 1);
+  int32_t dx = bb_ui_canvas_x(), dy = bb_ui_canvas_y();
+  draw(BB_POINTER(0x0060461c), dx, dy, 255, 1);
 
   /* Unsigned increment reproduces the original 32-bit wrapping instruction. */
   BB_U32(0x004843f8) += 1;
@@ -59,11 +61,11 @@ void bb_loading_progress(void) {
     return;
 
   BB_I32(0x004843fc) = segments;
-  draw(BB_POINTER(0x006634fc), 134, 396, 0, 1);
-  int x = 136;
+  draw(BB_POINTER(0x006634fc), 134 + dx, 396 + dy, 0, 1);
+  int x = 136 + dx;
   for (int i = 0; i < segments; i++, x += 4)
-    draw(BB_POINTER(0x006634fc), x, 396, 1, 1);
-  draw(BB_POINTER(0x006634fc), x, 396, 2, 1);
+    draw(BB_POINTER(0x006634fc), x, 396 + dy, 1, 1);
+  draw(BB_POINTER(0x006634fc), x, 396 + dy, 2, 1);
   present((void *)(uintptr_t)0x004eebc8);
 }
 

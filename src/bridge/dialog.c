@@ -5,6 +5,7 @@
 #include "dialog.h"
 #include "interop.h"
 #include "session_controls.h"
+#include "ui_layout.h"
 #include <string.h>
 #define BYTE(a) BB_U8(a)
 #define TEXT(a) ((const char *)(uintptr_t)(a))
@@ -207,13 +208,14 @@ void BB_THISCALL bb_dialog_select_entry(void *object,
 }
 void BB_THISCALL bb_dialog_draw_entry(void *object) {
   uintptr_t p = (uintptr_t)object;
+  int32_t dx = bb_ui_canvas_x(), dy = bb_ui_canvas_y();
   if (BYTE(p + 4)) {
     if (BYTE(p + 4) == 1)
-      M4(0x0042fd90, BB_U32(0x006ab57c), 0, 0, 255, 1);
+      M4(0x0042fd90, BB_U32(0x006ab57c), dx, dy, 255, 1);
     return;
   }
-  M4(0x0042fd90, BB_U32(0x005c77b8), 0, 0, 255, 1);
-  M4(0x0042fd90, BB_U32(0x006aff34), 202, 36, 255, 1);
+  M4(0x0042fd90, BB_U32(0x005c77b8), dx, dy, 255, 1);
+  M4(0x0042fd90, BB_U32(0x006aff34), 202 + dx, 36 + dy, 255, 1);
   M0(0x00420900, 0x006af100);
   uint32_t x = BB_U32(p + 14), y = BB_U32(p + 18), first = y;
   y += 32;
@@ -247,8 +249,9 @@ void BB_THISCALL bb_dialog_draw_entry(void *object) {
   } else
     M1(0x00420a60, 0x006af100, 0);
   if (BB_U32(p + 0x249e))
-    M6(0x004306e0, 0x006a9968, p + 0x24ae, BB_U32(p + 0x24a2) - 300,
-       BB_U32(p + 0x24a6), 600, 1, 0);
+    M6(0x004306e0, 0x006a9968, p + 0x24ae,
+       BB_U32(p + 0x24a2) - 300 + dx,
+       BB_U32(p + 0x24a6) + dy, 600, 1, 0);
 }
 void BB_THISCALL bb_dialog_tick_entry(void *object) {
   uintptr_t p = (uintptr_t)object;

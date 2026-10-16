@@ -56,16 +56,14 @@ The experimental range is width 640–1920 (a multiple of four) and height
 actor and submitted a movement command at 640x480, 1280x720, 1280x960 and
 1920x1080. These checks are not full mission playthroughs.
 
-Larger viewports still expose layout defects inherited from the resolution
-patch: the top toolbar stops at 640 pixels, the weather icon keeps its old
-position, thought bubbles can detach from the portrait, and menu artwork and
-controls do not share a consistent anchor. Keep this opt-in while those issues
-are addressed.
+The toolbar extends across the viewport with profession buttons at the right
+edge. Weather, portrait animations, stock text and tooltips follow their screen
+anchors. Menus, loading screens and briefings keep their original pixel size
+and use a centered 640x480 canvas. Moved toolbar buttons and menu hover areas
+use the same coordinates as their drawing.
 
-For complete support, keep the game viewport separate from presentation size;
-anchor UI drawing, hit areas and dirty rectangles together; center or scale
-the original menu/video artwork in its own 640x480 canvas; and check scrolling,
-selection, build menus and dialogs at each supported aspect ratio. UI scaling
-should be a separate setting so larger monitors can show more map without
-making controls too small. Resizing the window should continue scaling the
-chosen viewport with black borders, rather than changing it mid-mission.
+Keep larger viewports opt-in while playtesting the remaining screens and
+missions. Independent UI scaling is not implemented; choose a smaller internal
+viewport if the original controls become too small. Window resizing continues
+scaling the chosen viewport with black borders, without changing its dimensions
+mid-mission.

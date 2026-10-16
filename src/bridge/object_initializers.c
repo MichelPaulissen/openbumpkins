@@ -9,6 +9,7 @@
 #include "script.h"
 #include "world.h"
 #include "game_calls.h"
+#include "ui_layout.h"
 #include <string.h>
 #define BYTE(a) BB_U8(a)
 #define WORD(a) BB_U16(a)
@@ -234,11 +235,11 @@ void *BB_THISCALL bb_tooltip_construct_entry(void *object) {
 /* Extracted from selection_panels.c. */
 void BB_THISCALL bb_tooltip_initialize_entry(void *object) {
   uintptr_t p = (uintptr_t)object;
-  BB_U32(p + 10) = 320;
+  BB_I32(p + 10) = BB_I32(0x484444) / 2;
   BB_U32(p) = 1;
   BYTE(p + 34) = 0;
   BYTE(p + 9) = 0;
-  BB_U32(p + 14) = 475;
+  BB_I32(p + 14) = bb_ui_bottom(475);
   BB_U32(p + 4) = 1;
   BYTE(p + 8) = 0;
 }

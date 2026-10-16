@@ -8,6 +8,7 @@
 #include "interop.h"
 #include "statistics.h"
 #include "world.h"
+#include "ui_layout.h"
 #include <math.h>
 #include <string.h>
 #define BYTE(a) BB_U8(a)
@@ -91,6 +92,22 @@ static uintptr_t selected_actor(void) {
 void BB_THISCALL bb_toolbar_draw_entry(void *object) {
   uintptr_t p = (uintptr_t)object;
   sprite(0x5db044, 0, 0, 255);
+  if (BB_I32(0x484444) > 640) {
+    /* Extend the stone between the left controls and right profession bank.
+     * The source strip contains no icons. Keep the source artwork intact. */
+    int32_t end = bb_ui_right(432);
+    for (int32_t x = 384; x < end; x += 32) {
+      uint32_t width = (uint32_t)(end - x < 32 ? end - x : 32);
+      bb_sprite_draw_region(PTR(BB_U32(0x5db044)), 400, 0, width, 41, x, 0,
+                             NULL);
+    }
+    int32_t viewport[4];
+    memcpy(viewport, BB_SPAN(0x4eebc8, sizeof viewport), sizeof viewport);
+    bb_display_intersect(PTR(0x4eebc8), end, 0, 208, 41);
+    sprite(0x5db044, (uint32_t)bb_ui_right(0), 0, 255);
+    memcpy(BB_SPAN(0x4eebc8, sizeof viewport), viewport, sizeof viewport);
+    rectangle(0, 0, BB_U32(0x484444) - 1, 40);
+  }
   for (unsigned i = 1; i <= 5; ++i)
     if (BB_U32(p + i * 4u))
       sprite(0x63f030, 148 + (i - 1) * 34, 4, 9 + i);
@@ -104,7 +121,8 @@ void BB_THISCALL bb_toolbar_draw_entry(void *object) {
       for (int32_t i = 0; i < BB_I32(0x5e5eee + prof * 292u); ++i) {
         unsigned kind = BYTE(0x5e5ee8 + prof * 292u + (uint32_t)i);
         sprite(BYTE(actor + 0xfc) == kind ? 0x63f030 : 0x63f0a0,
-               601u - (uint32_t)i * 34u, 4, BYTE(0x5f6f58 + kind * 33u));
+               (uint32_t)bb_ui_right(601) - (uint32_t)i * 34u, 4,
+               BYTE(0x5f6f58 + kind * 33u));
       }
     }
   }
@@ -126,6 +144,7 @@ bb_toolbar_click_entry(void *object, int32_t x, int32_t y) {
   uintptr_t p = (uintptr_t)object;
   if (y > 40)
     return 0;
+  x = bb_ui_toolbar_local_x(x);
   if (y >= 4 && y <= 35) {
     if (x >= 147 && x <= 183) {
       BB_U32(p + 24) = 0;
@@ -214,6 +233,7 @@ static void copy_text(char *out, uintptr_t source) {
 }
 void bb_toolbar_help_c(int32_t x, int32_t y, char *out, int32_t selector) {
   (void)y;
+  x = bb_ui_toolbar_local_x(x);
   copy_text(out, 0x48481c);
   uintptr_t slot = 0;
   if (x < 147)

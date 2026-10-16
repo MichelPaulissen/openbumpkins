@@ -224,7 +224,7 @@ bb_stock_panel_animation_entry(void *object, uint32_t animation) {
   uintptr_t p = (uintptr_t)object;
   if (!BB_U32(p + 8)) {
     BB_U32(p + 12) = 0;
-    BB_U32(p + 16) = 550;
+    BB_U32(p + 16) = BB_U32(p) + 10;
     BB_U32(p + 8) = animation;
     BB_U32(p + 20) = BB_U32(p + 4) + 20;
   }
@@ -299,7 +299,7 @@ void BB_THISCALL bb_stock_panel_tick_entry(void *object) {
     BB_U32(p + 20) = BB_U32(p + 28) - stock_sine(tick - 20);
   else
     --BB_U32(p + 20);
-  uint32_t position = stock_sine(tick) + 600;
+  uint32_t position = stock_sine(tick) + BB_U32(p) + 60;
   BB_U32(p + 12) = (uint32_t)tick + 1;
   BB_U32(p + 16) = position;
   if (BB_U32(p + 12) == 120)
