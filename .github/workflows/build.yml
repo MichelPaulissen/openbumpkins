@@ -92,6 +92,13 @@ jobs:
           cp build/ci/bumpkins.exe LICENSE README.md dist/
           cp LICENSES/* dist/LICENSES/
           cp /ucrt64/bin/SDL2.dll /ucrt64/bin/libwinpthread-1.dll /ucrt64/bin/libgcc_s_seh-1.dll dist/
+          cp -R /ucrt64/share/licenses/SDL2 /ucrt64/share/licenses/libgcc /ucrt64/share/licenses/libwinpthread dist/LICENSES/
+      - name: Verify Windows package without the build environment
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          & ./dist/bumpkins.exe --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openbumpkins-windows-x86_64

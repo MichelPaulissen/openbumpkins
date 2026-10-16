@@ -54,7 +54,11 @@ static uint32_t debug_word(uint32_t value) { return value; }
 #endif
 static void breakpoint(void) {
 #ifdef BB_MODEL_RUNTIME
+#ifdef _WIN32
+  bb_host_debug_break();
+#else
   raise(SIGTRAP);
+#endif
 #else
   __asm__ volatile("int3");
 #endif

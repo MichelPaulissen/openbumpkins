@@ -141,6 +141,7 @@ long bb_host_pagesize(int name) {
   return (long)info.dwPageSize;
 }
 void bb_host_initialize(void) { _set_fmode(_O_BINARY); }
+void bb_host_debug_break(void) { DebugBreak(); }
 char *bb_host_realpath(const char *path, char *output) {
   struct stat info;
   if (stat(path, &info))

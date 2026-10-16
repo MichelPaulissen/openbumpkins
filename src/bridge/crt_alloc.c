@@ -22,7 +22,11 @@ void bb_crt_boot_delete_entry(void *p) {
 #endif
     if (result == 1)
 #ifdef BB_MODEL_RUNTIME
+#ifdef _WIN32
+      bb_host_debug_break();
+#else
       raise(SIGTRAP);
+#endif
 #else
       __asm__ volatile("int3");
 #endif

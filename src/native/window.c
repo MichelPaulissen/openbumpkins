@@ -788,6 +788,8 @@ int bb_native_dispatch_pending(U32 *quit_code) {
 }
 static int W WaitMessage(void) { return bb_window && SDL_WaitEvent(NULL); }
 static Handle W BeginPaint(Handle window, void *paint) {
+  if (!paint)
+    return NULL;
   memset(paint, 0, 64);
   U32 context = 1;
   memcpy(paint, &context, sizeof context);

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 int bb_skip_intro, bb_trace, bb_fast;
 uint32_t bb_language;
@@ -20,6 +21,8 @@ static uint32_t invoke(const char *dll, const char *name,
                        const uint32_t *args, size_t count) {
   uint32_t id = bb_platform_model_export(dll, name);
   struct bb_call_state state = {0, 0, 0, 0x202};
+  if (!id)
+    fprintf(stderr, "Missing host service: %s!%s\n", dll, name);
   CHECK(id);
   bb_model_invoke(&state, id, args, count);
   return state.eax;
@@ -91,11 +94,27 @@ int main(void) {
   CHECK(K("CloseHandle", mapping));
   CHECK(BB_U8(view + 26) == 26);
   CHECK(K("UnmapViewOfFile", view));
-  CHECK(K("CloseHandle", file) && K("DeleteFileA", scratch));
+  CHECK(K("CloseHandle", file));
+  char *path = bb_path(BB_DATA(scratch));
+  CHECK(unlink(path) == 0);
+  free(path);
   CHECK(K("GetDiskFreeSpaceA", 0, scratch + 800, scratch + 804,
           scratch + 808, scratch + 812));
   CHECK(BB_U32(scratch + 800) && BB_U32(scratch + 804));
   CHECK(K("GetTimeZoneInformation", scratch + 1024) != UINT32_MAX);
+  BB_U16(scratch + 1400) = 1601;
+  BB_U16(scratch + 1402) = 1;
+  BB_U16(scratch + 1406) = 1;
+  CHECK(K("SystemTimeToFileTime", scratch + 1400, scratch + 1424));
+  CHECK(BB_U64(scratch + 1424) == 0);
+  CHECK(K("FileTimeToSystemTime", scratch + 1424, scratch + 1440));
+  CHECK(BB_U16(scratch + 1440) == 1601 && BB_U16(scratch + 1442) == 1 &&
+        BB_U16(scratch + 1446) == 1);
+  BB_U32(scratch + 1600) = 64;
+  CHECK(!CALL("ADVAPI32.dll", "RegEnumValueA", 0, 0, scratch + 1616,
+              scratch + 1600, 0, 0, 0, scratch + 1604));
+  CHECK(!strcmp(BB_DATA(scratch + 1616), "Audio") &&
+        BB_U32(scratch + 1604) == 10);
 
   uint32_t event = K("CreateEventA", 0, 0, 0, 0);
   CHECK(event && K("WaitForSingleObject", event, 2) == 258);

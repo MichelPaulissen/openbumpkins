@@ -2,6 +2,7 @@
 #include "codepage.h"
 #include "native.h"
 #include <stdio.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -73,7 +74,9 @@ static U16 *read_profile(const char *filename, size_t *count) {
     return NULL;
   long length;
   if (fseek(file, 0, SEEK_END) || (length = ftell(file)) < 0 ||
+#if SIZE_MAX <= ULONG_MAX
       (unsigned long)length > SIZE_MAX / sizeof(U16) - 1 ||
+#endif
       fseek(file, 0, SEEK_SET)) {
     fclose(file);
     return NULL;

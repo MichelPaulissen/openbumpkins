@@ -35,7 +35,11 @@ static int32_t byte_wide(uint32_t cp, uint32_t flags, const char *src,
 static void assertion(uint32_t file, uint32_t line, uint32_t text) {
 #ifdef BB_MODEL_RUNTIME
   if (BB_GAME_CALL(0x00470ef0u, 0, 2, file, line, 0, text) == 1)
+#ifdef _WIN32
+    bb_host_debug_break();
+#else
     raise(SIGTRAP);
+#endif
 #else
   if (bb_crt_errors_report_entry(2, STR(file), line, NULL, STR(text)) == 1)
     __asm__ volatile("int3");

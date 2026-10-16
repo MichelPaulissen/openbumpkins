@@ -17,7 +17,7 @@ static void set_zone(uint32_t *r) {
   (void)r;
   bb_crt_time_set_zone_entry();
 }
-static void daylight(uint32_t *r) {
+static void model_daylight(uint32_t *r) {
   r[7] = bb_crt_time_daylight_entry((const int32_t *)(uintptr_t)A(0));
 }
 static void transition(uint32_t *r) {
@@ -33,7 +33,7 @@ const struct bb_model_target *bb_crt_time_model_find(void *unused,
       {0x472aa0, bb_crt_time_local_c, 7, 128, 0},
       {0x47c550, initialize, 0, 0, 0},
       {0x47c580, set_zone, 0, 0, 0},
-      {0x47c8e0, daylight, 1, 0, 0},
+      {0x47c8e0, model_daylight, 1, 0, 0},
       {0x47cc50, transition, 11, 0, 0}};
   for (unsigned n = 0; n < sizeof targets / sizeof *targets; n++)
     if (targets[n].identity == id)

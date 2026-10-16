@@ -16,7 +16,7 @@ static void exit_process(uint32_t *r) { (void)r; bb_crt_boot_exit_entry(A(0)); }
 static void exit_quick(uint32_t *r) { (void)r; bb_crt_boot_quick_exit_entry(A(0)); }
 static void fatal(uint32_t *r) { (void)r; bb_crt_boot_fatal_entry(A(0)); }
 static void noop(uint32_t *r) { (void)r; bb_crt_boot_noop_entry(); }
-static void onexit(uint32_t *r) { r[7] = bb_address_encode(bb_crt_boot_onexit_entry(P(0))); }
+static void model_onexit(uint32_t *r) { r[7] = bb_address_encode(bb_crt_boot_onexit_entry(P(0))); }
 static void atexit_callback(uint32_t *r) { r[7] = bb_crt_boot_atexit_entry(P(0)); }
 static void exit_table(uint32_t *r) { (void)r; bb_crt_boot_exit_table_entry(); }
 static void exception(uint32_t *r) { r[7] = bb_crt_signal_exception_entry(A(0), P(1)); }
@@ -73,7 +73,7 @@ static const struct bb_model_target targets[] = {
     {0x0046bf00u, exit_quick, 1, 0, 0},
     {0x0046d620u, fatal, 1, 0, 0},
     {0x0046c0b0u, noop, 0, 0, 0},
-    {0x0046c320u, onexit, 1, 0, 0},
+    {0x0046c320u, model_onexit, 1, 0, 0},
     {0x0046c3e0u, atexit_callback, 1, 0, 0},
     {0x0046c410u, exit_table, 0, 0, 0},
     {0x004753e0u, exception, 2, 0, 0},

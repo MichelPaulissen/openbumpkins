@@ -21,7 +21,11 @@ static void assertion(uintptr_t file, uint32_t line, uintptr_t expression) {
 #ifdef BB_MODEL_RUNTIME
   if (BB_GAME_CALL(0x00470ef0u, 0, 2, (uint32_t)file, line, 0,
                     (uint32_t)expression) == 1)
+#ifdef _WIN32
+    bb_host_debug_break();
+#else
     raise(SIGTRAP);
+#endif
 #else
   if (bb_crt_errors_report_entry(2, (const char *)file, line, NULL,
                                    (const char *)expression) == 1)
