@@ -14,7 +14,9 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <sys/statvfs.h>
+#endif
 #include <time.h>
 #include <unistd.h>
 static _Atomic(uintptr_t) standard_handles[3] = {1, 2, 3};
@@ -65,10 +67,14 @@ static int W ReadFile(Handle handle, void *data, U32 size, U32 *read_out,
     *read_out = amount < 0 ? 0 : (U32)amount;
   if (amount < 0) {
     int saved_errno = errno;
+#ifdef _WIN32
+    bb_kernel_last_error = saved_errno == EBADF ? 5 : bb_kernel_errno();
+#else
     int mode = saved_errno == EBADF ? fcntl(fd, F_GETFL) : -1;
     errno = saved_errno;
     bb_kernel_last_error =
         mode >= 0 && (mode & O_ACCMODE) == O_WRONLY ? 5 : bb_kernel_errno();
+#endif
   }
   if (!amount && size) {
     struct stat status;
@@ -88,10 +94,14 @@ static int W WriteFile(Handle handle, const void *data, U32 size, U32 *written,
     *written = amount < 0 ? 0 : (U32)amount;
   if (amount < 0) {
     int saved_errno = errno;
+#ifdef _WIN32
+    bb_kernel_last_error = saved_errno == EBADF ? 5 : bb_kernel_errno();
+#else
     int mode = saved_errno == EBADF ? fcntl(fd, F_GETFL) : -1;
     errno = saved_errno;
     bb_kernel_last_error =
         mode >= 0 && (mode & O_ACCMODE) == O_RDONLY ? 5 : bb_kernel_errno();
+#endif
   }
   return amount >= 0;
 }
@@ -253,15 +263,30 @@ static int W FileTimeToSystemTime(const void *input, U16 *output) {
   fill_time(output, &t, (int)((value % 10000000) / 10000));
   return 1;
 }
+#ifndef _WIN32
 static uint64_t file_time(int64_t seconds, long nanoseconds) {
   /* FILETIME counts 100 ns intervals since 1601, independently of host time_t
    * width and the archive format's coarser SYSTEMTIME millisecond precision. */
   return (uint64_t)seconds * UINT64_C(10000000) + UINT64_C(116444736000000000) +
          (uint64_t)nanoseconds / 100;
 }
+#endif
 static int W GetFileTime(Handle handle, void *created, void *accessed,
                          void *modified) {
   int fd = bb_file_descriptor(handle);
+#ifdef _WIN32
+  uint64_t times[3];
+  if (bb_host_file_times(fd, times)) {
+    bb_kernel_last_error = bb_kernel_errno();
+    return 0;
+  }
+  if (created)
+    memcpy(created, times, 8);
+  if (accessed)
+    memcpy(accessed, times + 1, 8);
+  if (modified)
+    memcpy(modified, times + 2, 8);
+#else
   struct stat s;
   if (fstat(fd, &s)) {
     bb_kernel_last_error = bb_kernel_errno();
@@ -298,6 +323,7 @@ static int W GetFileTime(Handle handle, void *created, void *accessed,
 #endif
     memcpy(modified, &value, 8);
   }
+#endif
   return 1;
 }
 static U32 W GetDriveTypeA(const char *path) { return 3; }
@@ -309,6 +335,15 @@ static U32 W GetLogicalDriveStringsA(U32 capacity, char *output) {
 }
 static int W GetDiskFreeSpaceA(const char *root, U32 *sectors, U32 *bytes,
                                U32 *free_clusters, U32 *total) {
+#ifdef _WIN32
+  uint32_t s, b, f, t;
+  if (!bb_host_disk_space(&s, &b, &f, &t))
+    return 0;
+  *sectors = s;
+  *bytes = b;
+  *free_clusters = f;
+  *total = t;
+#else
   struct statvfs v;
   if (statvfs(".", &v))
     return 0;
@@ -316,6 +351,7 @@ static int W GetDiskFreeSpaceA(const char *root, U32 *sectors, U32 *bytes,
   *sectors = (U32)v.f_frsize / 512;
   *free_clusters = (U32)v.f_bavail;
   *total = (U32)v.f_blocks;
+#endif
   return 1;
 }
 static int W GetVolumeInformationA(const char *root, char *name, U32 capacity,

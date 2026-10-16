@@ -71,6 +71,10 @@ static void crash(int signal, siginfo_t *info, void *context) {
 }
 #endif
 int main(int argc, char **argv) {
+#ifdef _WIN32
+  bb_host_initialize();
+  SDL_SetMainReady();
+#endif
   const char *directory = "work/patched";
   const char *cd_directory = "original/tracks";
   int cd_explicit = 0;

@@ -24,7 +24,7 @@ static Handle W GetCurrentProcess(void) { return (void *)UINT32_MAX; }
 static Handle W GetCurrentThread(void) { return (void *)(UINT32_MAX - 1); }
 static U32 W GetCurrentProcessId(void) { return (U32)getpid(); }
 static U32 W GetCurrentThreadId(void) {
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(_WIN32)
   /* Windows thread IDs are opaque four-byte values. Do not narrow Darwin's
    * pthread handle or its wider native numeric thread ID into that slot. */
   static atomic_uint next_id = 1;

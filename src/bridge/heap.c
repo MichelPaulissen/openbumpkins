@@ -3,6 +3,14 @@
 #include "address.h"
 #include <pthread.h>
 #include <string.h>
+#ifdef _WIN32
+#include <malloc.h>
+#define host_allocate(bytes) _aligned_malloc(bytes, 16)
+#define host_release(pointer) _aligned_free(pointer)
+#else
+#define host_allocate(bytes) aligned_alloc(16, bytes)
+#define host_release(pointer) free(pointer)
+#endif
 
 struct allocation {
   struct allocation *next;
@@ -26,7 +34,7 @@ static uint32_t allocate_locked(size_t size, int zero) {
     return 0;
   size_t capacity = (charge + 15u) & ~(size_t)15u;
   struct allocation *node = malloc(sizeof(*node));
-  void *host = node ? aligned_alloc(16, capacity) : NULL;
+  void *host = node ? host_allocate(capacity) : NULL;
   if (!host) {
     free(node);
     return 0;
@@ -35,7 +43,7 @@ static uint32_t allocate_locked(size_t size, int zero) {
 #ifdef BB_PORTABLE_RUNTIME
   if (!bb_address_bind_auto(0x20000000u, UINT64_C(0xf0000000), host, capacity,
                             16, &address)) {
-    free(host);
+    host_release(host);
     free(node);
     return 0;
   }
@@ -73,7 +81,7 @@ static void release_locked(struct allocation **slot) {
 #endif
   live_bytes -= node->size ? node->size : 1;
   --live_count;
-  free(node->host);
+  host_release(node->host);
   free(node);
 }
 int bb_heap_release(uint32_t address) {

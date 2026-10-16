@@ -5,6 +5,12 @@
 #include "native.h"
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+U32 bb_time_zone_information(int64_t seconds, void *output) {
+  (void)seconds;
+  return output ? bb_host_timezone(output) : UINT32_MAX;
+}
+#else
 
 /* TIME_ZONE_INFORMATION uses Windows UTF-16 and 32-bit minute biases. */
 struct ZoneInformation {
@@ -186,3 +192,4 @@ U32 bb_time_zone_information(int64_t seconds, void *output) {
   memcpy(output, &information, sizeof(information));
   return status;
 }
+#endif
