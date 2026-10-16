@@ -1,0 +1,23 @@
+{
+  "original": {
+    "bb_patch_supported_beasts_exe_md5": "2d2852fcb22e6f65a0cf3415abaf4411",
+    "observed_beasts_exe_sha256": "b30d7d0762dbd808407f0d95c6fdafa0b52ce67d0b0f20c8fbb7fa66a2213e89",
+    "machine": "i386",
+    "preferred_image_base": "0x00400000"
+  },
+  "bb_patch": {
+    "repository": "https://github.com/bb-patch/bb-patch",
+    "revision": "f2312876412ee356f7496fd66d72f88364b73bbe"
+  },
+  "equivalence": {
+    "target": "Game behavior with the pinned bb-patch applied, initially at the original 640x480 resolution with the console enabled; higher-resolution support follows later",
+    "initial_resolution": [640, 480],
+    "implementation_language": "C",
+    "audio_target": "Audibly equivalent playback, timing, volume/pan and loops without new clipping or distortion; exact floating-point rounding/status/register matches are not required for audio",
+    "final_platform": "native Linux",
+    "requires_original_game_assets": true,
+    "matching_recompiled_binary_required": false,
+    "incremental_binary_bridging_allowed": true,
+    "final_requires_original_executable": false
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "nodes": {
+    "bb-patch": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1691610073,
+        "narHash": "sha256-el+qSrrlcJ5MnvAeiV0X+g5izxWSKIa/H9S2mo7g1wU=",
+        "owner": "bb-patch",
+        "repo": "bb-patch",
+        "rev": "f2312876412ee356f7496fd66d72f88364b73bbe",
+        "type": "github"
+      },
+      "original": {
+        "owner": "bb-patch",
+        "repo": "bb-patch",
+        "rev": "f2312876412ee356f7496fd66d72f88364b73bbe",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1791594108,
+        "narHash": "sha256-XK4KceonkwD8LuMAt/vNrz982mXJM5jeHAxMwsUXXAQ=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "6510408d147d8c5e6d76043e899e9251756f6a75",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "bb-patch": "bb-patch",
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

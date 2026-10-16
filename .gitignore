@@ -1,0 +1,31 @@
+# User-supplied game files and local reference checkouts.
+/*.zip
+/original/
+/reference/
+/work/
+/.local-history/
+/AGENTS.md
+*.iso
+*.bin
+*.cue
+
+# Builds and development state.
+/build/
+/build-*/
+/result
+/result-*/
+/.direnv/
+/.wine/
+/.ghidra/
+*.gpr
+*.rep/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.so.*
