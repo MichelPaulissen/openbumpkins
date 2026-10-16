@@ -24,21 +24,33 @@ static I32 W RegEnumValueA(Handle key, U32 index, char *name, U32 *name_size,
       ".\\"};
   if (index >= 13)
     return 259;
+  if (!name_size || !data_size)
+    return 87;
   size_t length = strlen(names[index]);
-  if (*name_size <= length)
+  if (!name || *name_size <= length)
     return 234;
   memcpy(name, names[index], length + 1);
   *name_size = (U32)length;
   if (index >= 11) {
-    *type = 4;
+    if (type)
+      *type = 4;
+    if (!data) {
+      *data_size = 4;
+      return 0;
+    }
     if (*data_size < 4)
       return 234;
     U32 value = index == 11 ? 1 : bb_language;
     memcpy(data, &value, 4);
     *data_size = 4;
   } else {
-    *type = 1;
+    if (type)
+      *type = 1;
     size_t size = strlen(values[index]) + 1;
+    if (!data) {
+      *data_size = (U32)size;
+      return 0;
+    }
     if (*data_size < size)
       return 234;
     memcpy(data, values[index], size);

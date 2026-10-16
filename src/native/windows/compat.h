@@ -13,6 +13,8 @@ char *bb_host_strsep(char **, const char *);
 int bb_host_setenv(const char *, const char *, int);
 int bb_host_unsetenv(const char *);
 time_t bb_host_timegm(struct tm *);
+struct tm *bb_host_gmtime_r(const time_t *, struct tm *);
+struct tm *bb_host_localtime_r(const time_t *, struct tm *);
 long bb_host_pagesize(int);
 int bb_host_file_times(int, uint64_t[3]);
 int bb_host_disk_space(uint32_t *, uint32_t *, uint32_t *, uint32_t *);
@@ -22,6 +24,8 @@ uint32_t bb_host_timezone(void *);
 #define setenv bb_host_setenv
 #define unsetenv bb_host_unsetenv
 #define timegm bb_host_timegm
+#define gmtime_r bb_host_gmtime_r
+#define localtime_r bb_host_localtime_r
 #define sysconf bb_host_pagesize
 #define _SC_PAGESIZE 1
 #define lstat stat
