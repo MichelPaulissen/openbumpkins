@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "compat.h"
+#include "../calendar.h"
 #include <windows.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -168,53 +169,13 @@ int bb_host_setenv(const char *name, const char *value, int overwrite) {
 }
 int bb_host_unsetenv(const char *name) { return bb_host_setenv(name, "", 1); }
 time_t bb_host_timegm(struct tm *t) {
-  /* Signed Gregorian conversion also handles dates before the Windows CRT's
-   * epoch. SYSTEMTIME permits day overflow (including non-leap February 29). */
-  int64_t y = (int64_t)t->tm_year + 1900, month = t->tm_mon;
-  int64_t carry = month / 12;
-  if (month % 12 < 0)
-    --carry;
-  y += carry;
-  unsigned m = (unsigned)(month - carry * 12) + 1;
-  y -= m <= 2;
-  int64_t era = (y >= 0 ? y : y - 399) / 400;
-  unsigned yo = (unsigned)(y - era * 400);
-  unsigned day = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5;
-  int64_t days = era * 146097 + yo * 365 + yo / 4 - yo / 100 + day - 719468;
-  return (time_t)((days + t->tm_mday - 1) * 86400 +
-                  (int64_t)t->tm_hour * 3600 + t->tm_min * 60 + t->tm_sec);
+  return (time_t)bb_calendar_seconds(t);
 }
 struct tm *bb_host_gmtime_r(const time_t *seconds, struct tm *t) {
-  int64_t days = *seconds / 86400, rest = *seconds % 86400;
-  if (rest < 0) {
-    rest += 86400;
-    --days;
-  }
-  int64_t z = days + 719468;
-  int64_t era = (z >= 0 ? z : z - 146096) / 146097;
-  unsigned d = (unsigned)(z - era * 146097);
-  unsigned yo = (d - d / 1460 + d / 36524 - d / 146096) / 365;
-  int64_t year = era * 400 + yo;
-  unsigned yd = d - (365 * yo + yo / 4 - yo / 100);
-  unsigned mp = (5 * yd + 2) / 153;
-  unsigned day = yd - (153 * mp + 2) / 5 + 1;
-  unsigned month = mp < 10 ? mp + 3 : mp - 9;
-  year += month <= 2;
-  if (year - 1900 < INT_MIN || year - 1900 > INT_MAX) {
-    errno = EOVERFLOW;
-    return NULL;
-  }
-  memset(t, 0, sizeof(*t));
-  t->tm_year = (int)(year - 1900);
-  t->tm_mon = (int)month - 1;
-  t->tm_mday = (int)day;
-  t->tm_hour = (int)(rest / 3600);
-  t->tm_min = (int)(rest / 60 % 60);
-  t->tm_sec = (int)(rest % 60);
-  t->tm_wday = (int)((days % 7 + 11) % 7);
-  struct tm january = {.tm_year = t->tm_year, .tm_mday = 1};
-  t->tm_yday = (int)(days - bb_host_timegm(&january) / 86400);
-  return t;
+  if (bb_calendar_utc(*seconds, t))
+    return t;
+  errno = EOVERFLOW;
+  return NULL;
 }
 struct tm *bb_host_localtime_r(const time_t *seconds, struct tm *t) {
   return localtime_s(t, seconds) ? NULL : t;

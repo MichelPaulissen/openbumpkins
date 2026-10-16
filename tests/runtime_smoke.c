@@ -102,14 +102,27 @@ int main(void) {
           scratch + 808, scratch + 812));
   CHECK(BB_U32(scratch + 800) && BB_U32(scratch + 804));
   CHECK(K("GetTimeZoneInformation", scratch + 1024) != UINT32_MAX);
-  BB_U16(scratch + 1400) = 1601;
-  BB_U16(scratch + 1402) = 1;
-  BB_U16(scratch + 1406) = 1;
-  CHECK(K("SystemTimeToFileTime", scratch + 1400, scratch + 1424));
-  CHECK(BB_U64(scratch + 1424) == 0);
-  CHECK(K("FileTimeToSystemTime", scratch + 1424, scratch + 1440));
-  CHECK(BB_U16(scratch + 1440) == 1601 && BB_U16(scratch + 1442) == 1 &&
-        BB_U16(scratch + 1446) == 1);
+  static const struct { uint16_t year, month, day; uint64_t ticks; } dates[] = {
+      {1601, 1, 1, 0},
+      {1899, 12, 31, UINT64_C(94353984000000000)},
+      {1900, 3, 1, UINT64_C(94405824000000000)},
+      {1969, 12, 31, UINT64_C(116443872000000000)},
+      {1970, 1, 1, UINT64_C(116444736000000000)},
+      {2000, 2, 29, UINT64_C(125962560000000000)},
+      {2038, 1, 19, UINT64_C(137919456000000000)},
+      {2100, 3, 1, UINT64_C(157520160000000000)},
+      {9999, 12, 31, UINT64_C(2650466880000000000)}};
+  for (unsigned i = 0; i < sizeof(dates) / sizeof(*dates); ++i) {
+    BB_U16(scratch + 1400) = dates[i].year;
+    BB_U16(scratch + 1402) = dates[i].month;
+    BB_U16(scratch + 1406) = dates[i].day;
+    CHECK(K("SystemTimeToFileTime", scratch + 1400, scratch + 1424));
+    CHECK(BB_U64(scratch + 1424) == dates[i].ticks);
+    CHECK(K("FileTimeToSystemTime", scratch + 1424, scratch + 1440));
+    CHECK(BB_U16(scratch + 1440) == dates[i].year &&
+          BB_U16(scratch + 1442) == dates[i].month &&
+          BB_U16(scratch + 1446) == dates[i].day);
+  }
   BB_U32(scratch + 1600) = 64;
   CHECK(!CALL("ADVAPI32.dll", "RegEnumValueA", 0, 0, scratch + 1616,
               scratch + 1600, 0, 0, 0, scratch + 1604));
@@ -117,7 +130,15 @@ int main(void) {
         BB_U32(scratch + 1604) == 10);
 
   uint32_t event = K("CreateEventA", 0, 0, 0, 0);
-  CHECK(event && K("WaitForSingleObject", event, 2) == 258);
+  if (!event)
+    fprintf(stderr, "CreateEventA failed: %u\n",
+            invoke("KERNEL32.dll", "GetLastError", NULL, 0));
+  CHECK(event);
+  uint32_t waited = K("WaitForSingleObject", event, 2);
+  if (waited != 258)
+    fprintf(stderr, "Timed wait returned %u, error %u\n", waited,
+            invoke("KERNEL32.dll", "GetLastError", NULL, 0));
+  CHECK(waited == 258);
   CHECK(K("SetEvent", event));
   CHECK(K("WaitForSingleObject", event, 0) == 0);
   CHECK(K("WaitForSingleObject", event, 0) == 258 && K("CloseHandle", event));

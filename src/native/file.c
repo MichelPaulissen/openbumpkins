@@ -3,6 +3,7 @@
 #define _FILE_OFFSET_BITS 64
 #define _TIME_BITS 64
 #include "kernel_handle.h"
+#include "calendar.h"
 #ifdef BB_MODEL_RUNTIME
 #include "../bridge/address.h"
 #include "../bridge/heap.h"
@@ -244,7 +245,7 @@ static int W SystemTimeToFileTime(const U16 *input, void *output) {
   t.tm_sec = fields[6];
   /* wDayOfWeek is deliberately ignored. Valid dates fit native 64-bit time_t.
    */
-  uint64_t value = ((uint64_t)timegm(&t) + 11644473600ULL) * 10000000 +
+  uint64_t value = ((uint64_t)bb_calendar_seconds(&t) + 11644473600ULL) * 10000000 +
                    (uint64_t)fields[7] * 10000;
   memcpy(output, &value, sizeof(value));
   return 1;
@@ -258,7 +259,7 @@ static int W FileTimeToSystemTime(const void *input, U16 *output) {
     return bb_kernel_error(87);
   time_t seconds = (time_t)(value / 10000000) - INT64_C(11644473600);
   struct tm t;
-  if (!gmtime_r(&seconds, &t))
+  if (!bb_calendar_utc(seconds, &t))
     return bb_kernel_error(87);
   fill_time(output, &t, (int)((value % 10000000) / 10000));
   return 1;
