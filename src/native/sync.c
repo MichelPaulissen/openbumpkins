@@ -7,7 +7,7 @@
 int bb_kernel_wait_initialize(struct KernelHandle *h) {
   if (pthread_mutex_init(&h->mutex, NULL))
     return 0;
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(_WIN32)
   int error = pthread_cond_init(&h->condition, NULL);
 #else
   pthread_condattr_t attributes;
@@ -24,10 +24,10 @@ int bb_kernel_wait_initialize(struct KernelHandle *h) {
   return !error;
 }
 
-/* Darwin waits relative to a monotonic deadline; Linux configures the condition
- * clock directly. Recompute remaining time after every spurious wakeup. */
+/* Darwin and winpthreads accept relative waits; Linux configures a monotonic
+ * condition clock. Recompute remaining time after every spurious wakeup. */
 static int wait_until(struct KernelHandle *h, const struct timespec *limit) {
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(_WIN32)
   struct timespec now, remaining;
   clock_gettime(CLOCK_MONOTONIC, &now);
   remaining.tv_sec = limit->tv_sec - now.tv_sec;
