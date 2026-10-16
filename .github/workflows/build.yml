@@ -1,0 +1,95 @@
+name: Native builds
+
+on:
+  push:
+    branches: [ci/native-platforms]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-builds-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unix:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux-x86_64
+          - os: macos-15
+            platform: macos-arm64
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libsdl2-dev
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install ninja pkgconf sdl2
+      - name: Configure
+        run: cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUMPKINS_PORTABLE_GAME=ON
+      - name: Build
+        run: cmake --build build/ci --parallel 3
+      - name: Launcher smoke test
+        run: build/ci/bumpkins --help
+      - name: Collect executable and notices
+        run: |
+          mkdir -p dist/LICENSES
+          cp build/ci/bumpkins LICENSE README.md dist/
+          cp LICENSES/* dist/LICENSES/
+          if [ "${{ runner.os }}" = macOS ]; then
+            test "$(uname -m)" = arm64
+            otool -L dist/bumpkins
+          else
+            ldd dist/bumpkins
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: openbumpkins-${{ matrix.platform }}
+          path: dist/
+          if-no-files-found: error
+
+  windows:
+    name: windows-x86_64
+    runs-on: windows-2025
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-SDL2
+      - name: Configure
+        run: cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUMPKINS_PORTABLE_GAME=ON
+      - name: Build
+        run: cmake --build build/ci --parallel 3
+      - name: Launcher smoke test
+        run: build/ci/bumpkins.exe --help
+      - name: Collect executable, dependencies and notices
+        run: |
+          mkdir -p dist/LICENSES
+          cp build/ci/bumpkins.exe LICENSE README.md dist/
+          cp LICENSES/* dist/LICENSES/
+          cp /ucrt64/bin/SDL2.dll /ucrt64/bin/libwinpthread-1.dll /ucrt64/bin/libgcc_s_seh-1.dll dist/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: openbumpkins-windows-x86_64
+          path: dist/
+          if-no-files-found: error
