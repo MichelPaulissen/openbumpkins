@@ -16,6 +16,7 @@
 #include "../bridge/startup_models.h"
 #include "platform_models.h"
 #endif
+#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,6 +71,23 @@ static void crash(int signal, siginfo_t *info, void *context) {
   _exit(128 + signal);
 }
 #endif
+/* Larger viewports retain the original sprite size and expose more map.
+ * Keep the experiment within the range exercised by the native renderer. */
+static int resolution(const char *text, U32 *width, U32 *height) {
+  char *end;
+  if (*text < '0' || *text > '9')
+    return 0;
+  errno = 0;
+  unsigned long w = strtoul(text, &end, 10);
+  if (errno || *end != 'x' || end[1] < '0' || end[1] > '9')
+    return 0;
+  unsigned long h = strtoul(end + 1, &end, 10);
+  if (errno || *end || w < 640 || w > 1920 || h < 480 || h > 1080 || w % 4)
+    return 0;
+  *width = (U32)w;
+  *height = (U32)h;
+  return 1;
+}
 int main(int argc, char **argv) {
 #ifdef _WIN32
   bb_host_initialize();
@@ -79,6 +97,7 @@ int main(int argc, char **argv) {
   const char *cd_directory = "original/tracks";
   int cd_explicit = 0;
   int language_explicit = 0;
+  U32 width = 0, height = 0;
   for (int n = 1; n < argc; n++) {
     if (!strcmp(argv[n], "--game-dir") && n + 1 < argc)
       directory = argv[++n];
@@ -97,6 +116,12 @@ int main(int argc, char **argv) {
                "or spanish",
                name);
       language_explicit = 1;
+    } else if (!strcmp(argv[n], "--resolution") && n + 1 < argc) {
+      if (!resolution(argv[++n], &width, &height)) {
+        fprintf(stderr, "Invalid resolution '%s': use WIDTHxHEIGHT, width "
+                        "640..1920 (multiple of 4), height 480..1080\n", argv[n]);
+        return 1;
+      }
     } else if (!strcmp(argv[n], "--skip-intro"))
       bb_skip_intro = 1;
     else if (!strcmp(argv[n], "--trace"))
@@ -110,7 +135,7 @@ int main(int argc, char **argv) {
     else {
       fprintf(stderr,
               "Usage: %s [--game-dir DIR] [--cd-tracks DIR] [--skip-intro] "
-              "[--language NAME] "
+              "[--language NAME] [--resolution WIDTHxHEIGHT] "
               "[--trace] [--fast] "
               "[--stop-after-frames N] [--capture FILE]\n",
               argv[0]);
@@ -160,6 +185,12 @@ int main(int argc, char **argv) {
   PeModule *game = bb_pe_load("BEASTS.EXE");
   if (bb_address_encode(game->base) != 0x400000 || game->size < 0x31f000)
     bb_die("unsupported executable layout");
+  /* Apply before C global constructors anchor the UI to the viewport. This
+   * overrides asset metadata in memory; original files and saves stay intact. */
+  if (width) {
+    memcpy(game->base + 0x84444, &width, sizeof width);
+    memcpy(game->base + 0x84448, &height, sizeof height);
+  }
   PeModule *mixer = bb_pe_load("QMIXER95.DLL");
   if (bb_address_encode(mixer->base) != 0x10000000 || mixer->size != 0x25000)
     bb_die("unsupported QMIXER layout");

@@ -166,7 +166,37 @@ int main(void) {
   CHECK(!(SDL_GetWindowFlags(bb_window) & SDL_WINDOW_FULLSCREEN));
   key(SDL_KEYUP, SDLK_RETURN, KMOD_NONE, 0);
   CHECK(!U("PeekMessageA", scratch + 1200, 0, 0x100, 0x102, 1));
-  CHECK(SDL_ShowCursor(SDL_QUERY) == SDL_DISABLE && U("DestroyWindow", 1));
+  CHECK(SDL_ShowCursor(SDL_QUERY) == SDL_DISABLE);
+  /* SDL converts window events to game coordinates, including letterboxing.
+   * Exercise both pillarboxing and letterboxing at larger internal sizes. */
+  static const int sizes[][2] = {{640, 480}, {1280, 720}, {1920, 1080}};
+  SDL_SetWindowSize(bb_window, 1000, 600);
+  for (unsigned i = 0; i < sizeof sizes / sizeof *sizes; ++i) {
+    int width = sizes[i][0], height = sizes[i][1];
+    unsigned char *pixels = calloc((size_t)width, (size_t)height);
+    CHECK(pixels);
+    bb_display_pixels(pixels, width, height, width, 8, NULL);
+    free(pixels);
+    SDL_Event click = {0};
+    click.type = SDL_MOUSEBUTTONDOWN;
+    click.button.windowID = SDL_GetWindowID(bb_window);
+    click.button.button = SDL_BUTTON_LEFT;
+    click.button.x = 500;
+    click.button.y = 300;
+    CHECK(SDL_PushEvent(&click) == 1);
+    bb_pump_events();
+    CHECK(U("PeekMessageA", scratch + 1200, 0, 0x201, 0x201, 1));
+    uint32_t point = BB_U32(scratch + 1212);
+    CHECK(abs((int)(point & 0xffff) - width / 2) <= 1);
+    CHECK(abs((int)(point >> 16) - height / 2) <= 1);
+    /* Clicks outside the logical image must not activate game controls. */
+    click.button.x = 0;
+    click.button.y = 0;
+    CHECK(SDL_PushEvent(&click) == 1);
+    bb_pump_events();
+    CHECK(!U("PeekMessageA", scratch + 1200, 0, 0x201, 0x201, 1));
+  }
+  CHECK(U("DestroyWindow", 1));
   CHECK(SDL_InitSubSystem(SDL_INIT_AUDIO) == 0);
   SDL_AudioSpec desired = {0}, actual;
   desired.freq = 22050;
